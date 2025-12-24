@@ -1,7 +1,7 @@
 # Quick Setup - API Keys Needed
 
 ## ✅ What You Already Have
-- Google Places API Key: `AIzaSyAv2eA6tx1O9cX3IJkIpd2Kv349oaQT6Is`
+- Google Places API Key: (configured in Google Cloud Console)
 
 ## ❌ What You Need to Add
 
@@ -19,8 +19,8 @@
 Your `.env.local` file should look like this:
 
 ```bash
-# Google Places API (you already have this)
-NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyAv2eA6tx1O9cX3IJkIpd2Kv349oaQT6Is
+# Google Places API (get from Google Cloud Console)
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_api_key_here
 
 # Hugging Face API (ADD THIS)
 HUGGINGFACE_API_KEY=your_token_here_paste_it

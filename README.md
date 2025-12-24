@@ -70,11 +70,17 @@ OPENAI_API_KEY=your_openai_api_key
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-3. Enable the **Places API**
+3. Enable the **Places API**, **Directions API**, and **Geocoding API**
 4. Create credentials (API Key)
-5. Add the API key to `.env.local` as `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY`
+5. **IMPORTANT - Secure your API key:**
+   - Add **Website restrictions**: `localhost:3000/*` and your production domain
+   - Add **API restrictions**: Only enable the APIs you need (Places, Directions, Geocoding)
+   - This prevents unauthorized use even if the key is exposed
+6. Add the API key to `.env.local` as `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY`
 
 **Note:** The app will work without the API key, but location autocomplete suggestions won't appear.
+
+**Security:** Never commit API keys to Git. Always use environment variables and restrict your keys in Google Cloud Console.
 
 #### Hugging Face API Setup (Required for AI Extraction)
 

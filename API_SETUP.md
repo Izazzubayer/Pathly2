@@ -151,11 +151,13 @@ For a small app (100 trips/month, ~10 places per trip):
 ## Security Notes
 
 1. **Never commit API keys to git** - `.env.local` is in `.gitignore`
-2. **Restrict API keys in production:**
-   - Set domain restrictions for Google API
-   - Set usage quotas
-   - Monitor usage in Google Cloud Console
+2. **Restrict API keys immediately after creation:**
+   - **Website restrictions**: Add `localhost:3000/*` for development and your production domain(s)
+   - **API restrictions**: Only enable the specific APIs you need (Places, Directions, Geocoding)
+   - This prevents unauthorized use even if the key is accidentally exposed
 3. **For production:** Use environment variables in your hosting platform (Vercel, etc.)
+4. **Monitor usage:** Set up billing alerts in Google Cloud Console to catch unexpected usage
+5. **If a key is exposed:** Regenerate it immediately and update all environment variables
 
 ---
 

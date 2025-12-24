@@ -78,7 +78,7 @@ export default function ExtractPage() {
       }
       
       // Only extract if we have inspiration text OR files OR manual places
-      if (inspiration && inspiration.trim() || files.length > 0 || manualPlaces.length > 0) {
+      if ((inspiration && inspiration.trim()) || files.length > 0 || manualPlaces.length > 0) {
         handleExtract(inspiration || "", files.length > 0 ? files : undefined, manualPlaces.length > 0 ? manualPlaces : undefined);
       }
     }
@@ -100,6 +100,9 @@ export default function ExtractPage() {
 
       // If we have manual places, add them directly to the trip without AI extraction
       if (manualPlaces && manualPlaces.length > 0) {
+        console.log("🔵 Processing manual places:", manualPlaces);
+        console.log("🔵 Current trip places before:", currentTrip.places.length);
+        
         const newPlaces: Place[] = manualPlaces.map((mp) => ({
           id: mp.id,
           name: mp.name,
@@ -107,10 +110,13 @@ export default function ExtractPage() {
           coordinates: mp.coordinates,
           placeId: mp.placeId,
           confidence: 1.0, // Manual places have 100% confidence
-          source: "manual",
-          confirmed: true, // Auto-confirm manual places
+          source: "Manually added",
+          confirmed: false, // Let user review and confirm
           validated: !!mp.placeId, // Validated if we have a placeId from Google
         }));
+
+        console.log("🔵 Created places:", newPlaces);
+        console.log("🔵 New places count:", newPlaces.length);
 
         const updatedTrip = {
           ...currentTrip,
@@ -118,8 +124,15 @@ export default function ExtractPage() {
           updatedAt: new Date().toISOString(),
         };
 
-        updateTrip(updatedTrip);
+        console.log("🔵 Updated trip places:", updatedTrip.places);
+        console.log("🔵 Updated trip places count:", updatedTrip.places.length);
+        
+        updateTrip(currentTrip.id, updatedTrip);
         setTrip(updatedTrip);
+        
+        console.log("🔵 Trip state updated. Checking storage...");
+        const savedTrip = getTripById(currentTrip.id);
+        console.log("🔵 Saved trip places:", savedTrip?.places.length);
       }
 
       // If we have inspiration text or files, extract places using AI
@@ -185,7 +198,7 @@ export default function ExtractPage() {
           updatedAt: new Date().toISOString(),
         };
         
-        updateTrip(updatedTrip);
+        updateTrip(currentTrip.id, updatedTrip);
         setTrip(updatedTrip);
         
         console.log("Trip updated with places:", updatedTrip.places.length);
@@ -338,7 +351,7 @@ export default function ExtractPage() {
       updatedAt: new Date().toISOString(),
     };
 
-    updateTrip(updatedTrip);
+    updateTrip(trip.id, updatedTrip);
     setTrip(updatedTrip);
   };
 
@@ -667,7 +680,31 @@ export default function ExtractPage() {
                 </Card>
               ))}
             </div>
-          )}
+          ) : trip.places.length > 0 ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center space-y-3">
+                  <Filter className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <div>
+                    <p className="font-medium">No places match your filters</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Try adjusting your search or category filter
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterCategory("all");
+                      setShowConfirmedOnly(false);
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
     </main>

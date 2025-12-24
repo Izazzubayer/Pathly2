@@ -122,8 +122,9 @@ export default function NewTripPage() {
       return;
     }
 
-    if (!inspiration.trim() && uploadedFiles.length === 0) {
-      alert("Please provide some inspiration (text or files) to extract places from");
+    // Check if user has provided at least one source of places
+    if (!inspiration.trim() && uploadedFiles.length === 0 && manualPlaces.length === 0) {
+      alert("Please provide inspiration: search places manually, paste text/URLs, or upload files");
       return;
     }
 
@@ -166,7 +167,12 @@ export default function NewTripPage() {
 
       // Store manual places temporarily in sessionStorage for extraction
       if (manualPlaces.length > 0) {
+        console.log("🟢 Storing manual places in sessionStorage:", manualPlaces);
+        console.log("🟢 Manual places count:", manualPlaces.length);
         sessionStorage.setItem(`trip_${trip.id}_manualPlaces`, JSON.stringify(manualPlaces));
+        console.log("🟢 Stored in sessionStorage with key:", `trip_${trip.id}_manualPlaces`);
+      } else {
+        console.log("🔴 No manual places to store");
       }
       
       // Navigate to extraction page with inspiration
@@ -221,46 +227,46 @@ export default function NewTripPage() {
 
                   <div className="grid md:grid-cols-3 gap-6">
                     {/* Destination */}
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                       <Label htmlFor="destination" className="text-base">
                         Destination <span className="text-destructive">*</span>
                       </Label>
-                      <PlacesAutocomplete
-                        id="destination"
-                        value={destination}
-                        onChange={setDestination}
-                        onSelect={(place) => {
-                          setDestination(place.address);
+                    <PlacesAutocomplete
+                      id="destination"
+                      value={destination}
+                      onChange={setDestination}
+                      onSelect={(place) => {
+                        setDestination(place.address);
                           setDestinationCoords(place.coordinates || null);
                           // Clear hotel selection when destination changes
                           setHotel("");
                           setHotelData(null);
-                        }}
-                        placeholder="e.g., Bangkok, Thailand"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Start typing to see location suggestions
-                      </p>
-                    </div>
+                      }}
+                      placeholder="e.g., Bangkok, Thailand"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Start typing to see location suggestions
+                    </p>
+                  </div>
 
                     {/* Hotel */}
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                       <Label htmlFor="hotel" className="text-base">
                         Hotel (Anchor) <span className="text-destructive">*</span>
                       </Label>
-                      <PlacesAutocomplete
-                        id="hotel"
-                        value={hotel}
-                        onChange={setHotel}
-                        onSelect={(place) => {
+                    <PlacesAutocomplete
+                      id="hotel"
+                      value={hotel}
+                      onChange={setHotel}
+                      onSelect={(place) => {
                           setHotel(place.name); // Show name instead of address
-                          setHotelData({
-                            name: place.name,
-                            address: place.address,
-                            placeId: place.placeId,
-                            coordinates: place.coordinates,
-                          });
-                        }}
+                        setHotelData({
+                          name: place.name,
+                          address: place.address,
+                          placeId: place.placeId,
+                          coordinates: place.coordinates,
+                        });
+                      }}
                         placeholder={
                           destinationCoords 
                             ? "e.g., Four Wings Hotel" 
@@ -289,10 +295,10 @@ export default function NewTripPage() {
                         onEndDateChange={setEndDate}
                         placeholder="Select your travel dates"
                         minDate={new Date()}
-                      />
-                      <p className="text-xs text-muted-foreground">
+                    />
+                    <p className="text-xs text-muted-foreground">
                         Select your check-in and check-out dates
-                      </p>
+                    </p>
                     </div>
                   </div>
 
@@ -353,8 +359,8 @@ export default function NewTripPage() {
                         };
                         return (
                           <button
-                            key={type}
-                            type="button"
+                          key={type}
+                          type="button"
                             onClick={() => handleTravelerTypeChange(type)}
                             className={`
                               relative p-5 rounded-xl border-2 transition-all text-left group
@@ -395,9 +401,9 @@ export default function NewTripPage() {
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {getAvailableTags(travelerType).map(({ tag, label, desc }) => (
                           <button
-                            key={tag}
-                            type="button"
-                            onClick={() => toggleTag(tag)}
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
                             className={`
                               p-4 rounded-lg border-2 transition-all text-left
                               ${travelerTags.includes(tag)
@@ -493,7 +499,7 @@ export default function NewTripPage() {
 
                     {/* Tab 1: Manual Place Input */}
                     <TabsContent value="manual" className="space-y-4 mt-6">
-                      <div className="space-y-2">
+                    <div className="space-y-2">
                         <Label className="text-base">Search and Add Places</Label>
                         <p className="text-sm text-muted-foreground">
                           Search for specific restaurants, attractions, or any place you want to visit
@@ -513,8 +519,8 @@ export default function NewTripPage() {
                         </Label>
                         <p className="text-sm text-muted-foreground">
                           AI will automatically extract place names from your text, links, or notes
-                        </p>
-                      </div>
+                      </p>
+                    </div>
                       <Textarea
                         id="inspiration"
                         placeholder="Paste URLs or notes here...&#10;&#10;Example:&#10;https://www.instagram.com/reel/...&#10;https://www.youtube.com/watch?v=...&#10;ICONSIAM, Bangkok&#10;Chatuchak Weekend Market&#10;..."
@@ -534,8 +540,8 @@ export default function NewTripPage() {
                         <Label className="text-base">Upload Your Files</Label>
                         <p className="text-sm text-muted-foreground">
                           Upload PDFs, Word documents, text files, or screenshots. AI will extract places from them.
-                        </p>
-                      </div>
+                      </p>
+                    </div>
                       <FileUpload
                         onFilesSelected={setUploadedFiles}
                         acceptedTypes=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
@@ -546,35 +552,43 @@ export default function NewTripPage() {
                       </p>
                     </TabsContent>
                   </Tabs>
-                </div>
+                  </div>
 
                 {/* Submit Button */}
                 <div className="pt-4 border-t">
-                  <Button 
-                    type="submit" 
+                    <Button 
+                      type="submit" 
                     size="lg"
                     className="w-full text-base py-6" 
-                    disabled={isCreating || !destination.trim() || !hotel.trim() || !travelerType || !startDate || !endDate || (!inspiration.trim() && uploadedFiles.length === 0 && manualPlaces.length === 0)}
-                  >
-                    {isCreating ? (
-                      <>
+                    disabled={
+                      isCreating || 
+                      !destination.trim() || 
+                      !hotel.trim() || 
+                      !travelerType || 
+                      !startDate || 
+                      !endDate || 
+                      (manualPlaces.length === 0 && !inspiration.trim() && uploadedFiles.length === 0)
+                    }
+                    >
+                      {isCreating ? (
+                        <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Creating Trip & Extracting Places...
-                      </>
-                    ) : (
-                      <>
+                        </>
+                      ) : (
+                        <>
                         Create Trip & Extract Places
                         <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
+                        </>
+                      )}
+                    </Button>
                   <p className="text-xs text-center text-muted-foreground mt-3">
                     All fields marked with <span className="text-destructive">*</span> are required
                   </p>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
         </div>
       </div>
     </main>

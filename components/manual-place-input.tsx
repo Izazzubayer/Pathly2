@@ -11,6 +11,7 @@ interface ManualPlace {
   address: string;
   coordinates?: { lat: number; lng: number };
   placeId?: string;
+  types?: string[];
 }
 
 interface ManualPlaceInputProps {
@@ -22,7 +23,7 @@ export function ManualPlaceInput({ destinationCoords, onPlacesChange }: ManualPl
   const [places, setPlaces] = useState<ManualPlace[]>([]);
   const [currentInput, setCurrentInput] = useState("");
 
-  const handleAddPlace = (place: { name: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number } }) => {
+  const handleAddPlace = (place: { name: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; types?: string[] }) => {
     // Check for duplicates
     const isDuplicate = places.some((p) => p.placeId === place.placeId || p.name === place.name);
     if (isDuplicate) {
@@ -37,6 +38,7 @@ export function ManualPlaceInput({ destinationCoords, onPlacesChange }: ManualPl
       address: place.address,
       placeId: place.placeId,
       coordinates: place.coordinates,
+      types: place.types || [],
     };
     
     console.log("Adding place:", newPlace.name);

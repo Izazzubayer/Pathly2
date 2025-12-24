@@ -116,19 +116,68 @@ export async function validatePlace(
   }
 }
 
-function inferCategory(types: string[]): string {
+export function inferCategory(types: string[]): string {
   // Map Google Places types to our categories
   const typeMap: Record<string, string> = {
+    // Food & Dining
     restaurant: "food",
     food: "food",
     cafe: "food",
+    bakery: "food",
+    meal_takeaway: "food",
+    meal_delivery: "food",
+    
+    // Nightlife
     bar: "nightlife",
     night_club: "nightlife",
+    
+    // Nature
     park: "nature",
     zoo: "nature",
-    museum: "attraction",
+    aquarium: "nature",
+    natural_feature: "nature",
+    
+    // Shopping
+    shopping_mall: "shopping",
+    department_store: "shopping",
+    store: "shopping",
+    clothing_store: "shopping",
+    jewelry_store: "shopping",
+    shoe_store: "shopping",
+    
+    // Entertainment
+    movie_theater: "entertainment",
+    amusement_park: "entertainment",
+    bowling_alley: "entertainment",
+    casino: "entertainment",
+    
+    // Museum & Culture
+    museum: "museum",
+    art_gallery: "museum",
+    
+    // Attractions
     tourist_attraction: "attraction",
     point_of_interest: "attraction",
+    landmark: "attraction",
+    
+    // Religious
+    church: "religious",
+    mosque: "religious",
+    synagogue: "religious",
+    hindu_temple: "religious",
+    place_of_worship: "religious",
+    
+    // Wellness
+    spa: "wellness",
+    beauty_salon: "wellness",
+    gym: "wellness",
+    
+    // Beach
+    beach: "beach",
+    
+    // Adventure
+    campground: "adventure",
+    rv_park: "adventure",
   };
 
   for (const type of types) {

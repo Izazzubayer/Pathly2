@@ -12,6 +12,7 @@ interface PlacesAutocompleteProps {
     address: string; 
     placeId?: string;
     coordinates?: { lat: number; lng: number };
+    types?: string[];
   }) => void;
   placeholder?: string;
   id?: string;
@@ -120,7 +121,7 @@ export function PlacesAutocomplete({
     try {
       console.log("🔧 Initializing autocomplete with types:", types.length > 0 ? types : "all places");
       const autocompleteOptions: any = {
-        fields: ["formatted_address", "name", "place_id", "geometry"],
+        fields: ["formatted_address", "name", "place_id", "geometry", "types"],
       };
       
       // Only add types if provided (empty array means no restriction)
@@ -158,7 +159,10 @@ export function PlacesAutocomplete({
             address: place.formatted_address || place.name || "",
             placeId: place.place_id,
             coordinates,
+            types: place.types || [],
           };
+          
+          console.log("📍 Place types:", place.types);
           
           // Call onSelect first, then clear the input
           onSelect(selectedPlace);

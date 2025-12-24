@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getTripById, updateTrip } from "@/lib/storage";
-import { validatePlace } from "@/lib/places-api";
+import { validatePlace, inferCategory } from "@/lib/places-api";
 import { getCategoryIcon, getCategoryLabel, getCategoryColor } from "@/lib/category-utils";
 import { ArrowLeft, ArrowRight, Edit2, Check, X, AlertCircle, Loader2, MapPin, CheckCircle2, Sparkles, Filter, Search } from "lucide-react";
 import type { Trip, Place, PlaceCategory } from "@/types";
@@ -103,17 +103,28 @@ export default function ExtractPage() {
         console.log("🔵 Processing manual places:", manualPlaces);
         console.log("🔵 Current trip places before:", currentTrip.places.length);
         
-        const newPlaces: Place[] = manualPlaces.map((mp) => ({
-          id: mp.id,
-          name: mp.name,
-          category: "other" as PlaceCategory, // Default category for manual places
-          coordinates: mp.coordinates,
-          placeId: mp.placeId,
-          confidence: 1.0, // Manual places have 100% confidence
-          source: "Manually added",
-          confirmed: false, // Let user review and confirm
-          validated: !!mp.placeId, // Validated if we have a placeId from Google
-        }));
+        // Infer category from Google Places types (no extra API call needed)
+        const newPlaces: Place[] = manualPlaces.map((mp) => {
+          // Infer category from place types
+          let category: PlaceCategory = "other";
+          if (mp.types && mp.types.length > 0) {
+            const inferredCategory = inferCategory(mp.types);
+            category = inferredCategory as PlaceCategory;
+            console.log(`🔵 Inferred ${mp.name} as category: ${category} from types:`, mp.types);
+          }
+          
+          return {
+            id: mp.id,
+            name: mp.name,
+            category,
+            coordinates: mp.coordinates,
+            placeId: mp.placeId,
+            confidence: 1.0, // Manual places have 100% confidence
+            source: "Manually added",
+            confirmed: false, // Let user review and confirm
+            validated: !!mp.placeId, // Validated if we have a placeId from Google
+          };
+        });
 
         console.log("🔵 Created places:", newPlaces);
         console.log("🔵 New places count:", newPlaces.length);

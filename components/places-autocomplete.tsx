@@ -84,22 +84,49 @@ export function PlacesAutocomplete({
     
     script.onload = () => {
       console.log("✅ Google Maps script loaded");
-      if (window.google?.maps?.places) {
-        setIsScriptLoaded(true);
-        initializeAutocomplete();
-      } else {
-        console.error("❌ Google Maps loaded but Places library not available");
-        console.error("Make sure Places API is enabled in Google Cloud Console");
-      }
+      
+      // Sometimes the Places library takes a moment to initialize
+      // Retry a few times before giving up
+      let retries = 0;
+      const maxRetries = 10;
+      
+      const checkPlacesLibrary = () => {
+        if (window.google?.maps?.places) {
+          console.log("✅ Places library ready");
+          setIsScriptLoaded(true);
+          initializeAutocomplete();
+        } else if (retries < maxRetries) {
+          retries++;
+          console.log(`⏳ Waiting for Places library... (attempt ${retries}/${maxRetries})`);
+          setTimeout(checkPlacesLibrary, 100);
+        } else {
+          console.error("❌ Google Maps loaded but Places library not available after 10 retries");
+          console.error("Troubleshooting:");
+          console.error("1. Go to: https://console.cloud.google.com/apis/library/places-backend.googleapis.com");
+          console.error("2. Make sure 'Places API (New)' is ENABLED");
+          console.error("3. Check your API key restrictions allow this domain");
+          setIsScriptLoaded(false);
+        }
+      };
+      
+      checkPlacesLibrary();
     };
 
     script.onerror = (error) => {
       console.error("❌ Failed to load Google Maps script:", error);
-      console.error("Troubleshooting steps:");
-      console.error("1. Go to: https://console.cloud.google.com/apis/library");
-      console.error("2. Search for 'Places API' and enable it");
-      console.error("3. Check API key restrictions allow localhost");
-      console.error("4. Verify billing is enabled (free tier is fine)");
+      console.error("");
+      console.error("🔧 TROUBLESHOOTING STEPS:");
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("1. Enable Places API:");
+      console.error("   → https://console.cloud.google.com/apis/library/places-backend.googleapis.com");
+      console.error("");
+      console.error("2. Check API Key Restrictions:");
+      console.error("   → https://console.cloud.google.com/apis/credentials");
+      console.error("   → Make sure 'localhost:3000' is allowed");
+      console.error("");
+      console.error("3. Verify Billing (required even for free tier):");
+      console.error("   → https://console.cloud.google.com/billing");
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       setIsScriptLoaded(false);
     };
 

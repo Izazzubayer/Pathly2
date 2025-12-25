@@ -283,8 +283,8 @@ export default function RoutesPage() {
                       value={routeStart}
                       onChange={setRouteStart}
                       onSelect={(place) => {
-                        setRouteStart(place.address);
-                        setRouteStartName(place.name); // Store the name separately
+                        setRouteStart(place.name); // Display the name in the input
+                        setRouteStartName(place.name);
                         if (place.coordinates) {
                           setRouteStartCoords(place.coordinates);
                         } else {
@@ -313,8 +313,8 @@ export default function RoutesPage() {
                       value={routeEnd}
                       onChange={setRouteEnd}
                       onSelect={(place) => {
-                        setRouteEnd(place.address);
-                        setRouteEndName(place.name); // Store the name separately
+                        setRouteEnd(place.name); // Display the name in the input
+                        setRouteEndName(place.name);
                         if (place.coordinates) {
                           setRouteEndCoords(place.coordinates);
                         } else {

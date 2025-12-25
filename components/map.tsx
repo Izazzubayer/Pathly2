@@ -54,7 +54,7 @@ export function Map({
       return;
     }
 
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
     script.async = true;
     script.defer = true;
 
@@ -159,7 +159,7 @@ export function Map({
         markersRef.current.push(marker);
       });
 
-      // Add route polylines
+      // Add route polylines using pre-fetched polyline data
       routes.forEach((route) => {
         if (
           route.start.lat === 0 ||
@@ -170,35 +170,33 @@ export function Map({
           return;
         }
 
-        // Use Directions Renderer for proper route visualization
-        const directionsService = new window.google.maps.DirectionsService();
-        const directionsRenderer = new window.google.maps.DirectionsRenderer({
-          map,
-          suppressMarkers: true, // We'll use our own markers
-          polylineOptions: {
-            strokeColor: "#2563eb", // Blue color
-            strokeWeight: 5,
+        // If we have polyline data from server, use it directly
+        if (route.polyline) {
+          const decodedPath = window.google.maps.geometry.encoding.decodePath(route.polyline);
+          
+          const polyline = new window.google.maps.Polyline({
+            path: decodedPath,
+            geodesic: true,
+            strokeColor: "#2563eb",
             strokeOpacity: 0.8,
-          },
-          preserveViewport: true, // Don't auto-zoom, we'll handle bounds
-        });
+            strokeWeight: 5,
+            map,
+          });
 
-        directionsService.route(
-          {
-            origin: route.start,
-            destination: route.end,
-            travelMode: window.google.maps.TravelMode.DRIVING,
-          },
-          (result: any, status: any) => {
-            if (status === "OK") {
-              directionsRenderer.setDirections(result);
-            } else {
-              console.warn("Directions request failed:", status);
-            }
-          }
-        );
+          polylinesRef.current.push(polyline);
+        } else {
+          // Fallback: draw a simple line if no polyline data
+          const polyline = new window.google.maps.Polyline({
+            path: [route.start, route.end],
+            geodesic: true,
+            strokeColor: "#94a3b8",
+            strokeOpacity: 0.5,
+            strokeWeight: 3,
+            map,
+          });
 
-        polylinesRef.current.push(directionsRenderer);
+          polylinesRef.current.push(polyline);
+        }
       });
 
       // Fit bounds to show all markers and routes
@@ -229,42 +227,6 @@ export function Map({
       setError("Failed to initialize map");
       setIsLoading(false);
     }
-  };
-
-  // Decode polyline (simplified implementation)
-  const decodePolyline = (encoded: string): any[] => {
-    const poly = [];
-    let index = 0;
-    const len = encoded.length;
-    let lat = 0;
-    let lng = 0;
-
-    while (index < len) {
-      let b;
-      let shift = 0;
-      let result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
-      lng += dlng;
-
-      poly.push({ lat: lat * 1e-5, lng: lng * 1e-5 });
-    }
-
-    return poly;
   };
 
   if (error) {

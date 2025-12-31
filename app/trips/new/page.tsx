@@ -6,12 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileUpload } from "@/components/file-upload";
 import { DateRangePicker } from "@/components/date-picker";
-import { ManualPlaceInput } from "@/components/manual-place-input";
-import { ArrowRight, Loader2, Calendar as CalendarIcon, Users, MapPin, Hotel as HotelIcon, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Calendar as CalendarIcon, Users, MapPin, Hotel as HotelIcon } from "lucide-react";
 import { createEmptyTrip } from "@/lib/trip-utils";
 import { saveTrip } from "@/lib/storage";
 import { PlacesAutocomplete } from "@/components/places-autocomplete";
@@ -70,9 +66,6 @@ export default function NewTripPage() {
   };
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [inspiration, setInspiration] = useState("");
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [manualPlaces, setManualPlaces] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
   const toggleTag = (tag: string) => {
@@ -122,12 +115,6 @@ export default function NewTripPage() {
       return;
     }
 
-    // Check if user has provided at least one source of places
-    if (!inspiration.trim() && uploadedFiles.length === 0 && manualPlaces.length === 0) {
-      alert("Please provide inspiration: search places manually, paste text/URLs, or upload files");
-      return;
-    }
-
     setIsCreating(true);
 
     try {
@@ -150,37 +137,8 @@ export default function NewTripPage() {
       // Save trip
       saveTrip(trip);
       
-      // Store files temporarily in sessionStorage for extraction
-      if (uploadedFiles.length > 0) {
-        const fileData = await Promise.all(
-          uploadedFiles.map(async (file) => ({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            data: await file.arrayBuffer().then((buf) => 
-              Array.from(new Uint8Array(buf))
-            ),
-          }))
-        );
-        sessionStorage.setItem(`trip_${trip.id}_files`, JSON.stringify(fileData));
-      }
-
-      // Store manual places temporarily in sessionStorage for extraction
-      if (manualPlaces.length > 0) {
-        console.log("🟢 Storing manual places in sessionStorage:", manualPlaces);
-        console.log("🟢 Manual places count:", manualPlaces.length);
-        sessionStorage.setItem(`trip_${trip.id}_manualPlaces`, JSON.stringify(manualPlaces));
-        console.log("🟢 Stored in sessionStorage with key:", `trip_${trip.id}_manualPlaces`);
-      } else {
-        console.log("🔴 No manual places to store");
-      }
-      
-      // Navigate to extraction page with inspiration
-      const params = new URLSearchParams();
-      if (inspiration.trim()) {
-        params.set("inspiration", inspiration);
-      }
-      router.push(`/trips/${trip.id}/extract?${params.toString()}`);
+      // Navigate directly to the add places page
+      router.push(`/trips/${trip.id}/extract`);
     } catch (error) {
       console.error("Error creating trip:", error);
       setIsCreating(false);
@@ -207,7 +165,7 @@ export default function NewTripPage() {
           <div className="text-center space-y-3 mb-12">
             <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">Create New Trip</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Transform your scattered inspiration into a route-optimized itinerary
+              Set up your trip basics, then add places and plan routes
             </p>
           </div>
 
@@ -268,8 +226,8 @@ export default function NewTripPage() {
                         });
                       }}
                         placeholder={
-                          destinationCoords 
-                            ? "e.g., Four Wings Hotel" 
+                          destination 
+                            ? `Hotel in ${destination.split(',')[0].trim()}` 
                             : "Select destination first"
                         }
                         types={["lodging"]}
@@ -473,86 +431,6 @@ export default function NewTripPage() {
                   )}
                 </div>
 
-                {/* Section 3: Inspiration */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 pb-2 border-b">
-                    <Sparkles className="h-6 w-6 text-primary" />
-                    <div>
-                      <h2 className="text-xl font-semibold">Add Your Inspiration</h2>
-                      <p className="text-sm text-muted-foreground">Choose how you want to add places to your trip</p>
-                    </div>
-                  </div>
-
-                  {/* Tabs for different input methods */}
-                  <Tabs defaultValue="manual" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="manual">
-                        Search Places
-                      </TabsTrigger>
-                      <TabsTrigger value="text">
-                        Paste Text/URLs
-                      </TabsTrigger>
-                      <TabsTrigger value="files">
-                        Upload Files
-                      </TabsTrigger>
-                    </TabsList>
-
-                    {/* Tab 1: Manual Place Input */}
-                    <TabsContent value="manual" className="space-y-4 mt-6">
-                    <div className="space-y-2">
-                        <Label className="text-base">Search and Add Places</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Search for specific restaurants, attractions, or any place you want to visit
-                        </p>
-                      </div>
-                      <ManualPlaceInput
-                        destinationCoords={destinationCoords}
-                        onPlacesChange={setManualPlaces}
-                      />
-                    </TabsContent>
-
-                    {/* Tab 2: Text/URL Input */}
-                    <TabsContent value="text" className="space-y-4 mt-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="inspiration" className="text-base">
-                          Paste Text or URLs
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          AI will automatically extract place names from your text, links, or notes
-                      </p>
-                    </div>
-                      <Textarea
-                        id="inspiration"
-                        placeholder="Paste URLs or notes here...&#10;&#10;Example:&#10;https://www.instagram.com/reel/...&#10;https://www.youtube.com/watch?v=...&#10;ICONSIAM, Bangkok&#10;Chatuchak Weekend Market&#10;..."
-                        value={inspiration}
-                        onChange={(e) => setInspiration(e.target.value)}
-                        rows={10}
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Supports: Instagram reels/posts, YouTube videos, Google Maps links, plain text notes
-                      </p>
-                    </TabsContent>
-
-                    {/* Tab 3: File Upload */}
-                    <TabsContent value="files" className="space-y-4 mt-6">
-                      <div className="space-y-2">
-                        <Label className="text-base">Upload Your Files</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Upload PDFs, Word documents, text files, or screenshots. AI will extract places from them.
-                      </p>
-                    </div>
-                      <FileUpload
-                        onFilesSelected={setUploadedFiles}
-                        acceptedTypes=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
-                        maxFiles={10}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Supported formats: PDF, DOC, DOCX, TXT, MD, PNG, JPG, JPEG, WEBP
-                      </p>
-                    </TabsContent>
-                  </Tabs>
-                  </div>
 
                 {/* Submit Button */}
                 <div className="pt-4 border-t">
@@ -566,18 +444,17 @@ export default function NewTripPage() {
                       !hotel.trim() || 
                       !travelerType || 
                       !startDate || 
-                      !endDate || 
-                      (manualPlaces.length === 0 && !inspiration.trim() && uploadedFiles.length === 0)
+                      !endDate
                     }
                     >
                       {isCreating ? (
                         <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Creating Trip & Extracting Places...
+                        Creating Trip...
                         </>
                       ) : (
                         <>
-                        Create Trip & Extract Places
+                        Create Trip
                         <ArrowRight className="ml-2 h-5 w-5" />
                         </>
                       )}

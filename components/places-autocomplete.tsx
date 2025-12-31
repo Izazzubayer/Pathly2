@@ -19,6 +19,8 @@ interface PlacesAutocompleteProps {
   autoFocus?: boolean;
   types?: string[]; // Google Places types (e.g., ["(cities)"] or ["lodging"])
   locationBias?: { lat: number; lng: number }; // Bias results to a specific location
+  countryRestriction?: string; // ISO country code (e.g., "TH" for Thailand) - restricts to country
+  clearOnSelect?: boolean; // Whether to clear the input after selection (default: false)
 }
 
 declare global {
@@ -35,13 +37,25 @@ export function PlacesAutocomplete({
   placeholder,
   id,
   autoFocus,
-  types = ["(cities)"], // Default to cities
+  types = [], // Default to all places (empty array = no restriction)
   locationBias,
+  countryRestriction,
+  clearOnSelect = false, // Default: keep the value visible
 }: PlacesAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  
+  // Store callbacks in refs to avoid re-initializing autocomplete
+  const onSelectRef = useRef(onSelect);
+  const onChangeRef = useRef(onChange);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+    onChangeRef.current = onChange;
+  }, [onSelect, onChange]);
 
   useEffect(() => {
     // Check if Google Maps script is already loaded
@@ -156,8 +170,15 @@ export function PlacesAutocomplete({
         autocompleteOptions.types = types;
       }
       
-      // Add location bias if provided (restricts results to a specific area)
-      if (locationBias) {
+      // Add country restriction if provided (restricts to entire country)
+      if (countryRestriction) {
+        autocompleteOptions.componentRestrictions = {
+          country: countryRestriction.toLowerCase(),
+        };
+        console.log("🌍 Country restriction applied:", countryRestriction);
+      } else if (locationBias) {
+        // Add location bias if provided (restricts results to a specific area)
+        // Only use location bias if no country restriction is set
         const circle = new window.google.maps.Circle({
           center: locationBias,
           radius: 50000, // 50km radius around the destination
@@ -167,36 +188,76 @@ export function PlacesAutocomplete({
         console.log("🎯 Location bias applied:", locationBias);
       }
       
+      // Clean up existing autocomplete if it exists
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+      }
+      
       const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, autocompleteOptions);
+      autocompleteRef.current = autocomplete;
 
       autocomplete.addListener("place_changed", () => {
+        console.log("🔔 place_changed event fired!");
         const place = autocomplete.getPlace();
-        console.log("📍 Place selected:", place);
+        console.log("📍 Place selected from autocomplete:", place);
+        console.log("📍 Place details:", {
+          name: place.name,
+          address: place.formatted_address,
+          place_id: place.place_id,
+          geometry: place.geometry,
+          types: place.types,
+        });
         
-        if (place.formatted_address || place.name) {
-          const coordinates = place.geometry?.location
-            ? {
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng(),
-              }
-            : undefined;
+        // Check if place has valid data
+        if (!place) {
+          console.warn("⚠️ Place is null or undefined");
+          return;
+        }
+        
+        if (!place.formatted_address && !place.name) {
+          console.warn("⚠️ Place selected but missing name/address");
+          return;
+        }
+        
+        const coordinates = place.geometry?.location
+          ? {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            }
+          : undefined;
 
-          const selectedPlace = {
-            name: place.name || place.formatted_address || "",
-            address: place.formatted_address || place.name || "",
-            placeId: place.place_id,
-            coordinates,
-            types: place.types || [],
-          };
-          
-          console.log("📍 Place types:", place.types);
-          
-          // Call onSelect first, then clear the input
-          onSelect(selectedPlace);
-          // Don't update the input value - let parent component handle it
-          // onChange(selectedPlace.address);
+        const selectedPlace = {
+          name: place.name || place.formatted_address || "",
+          address: place.formatted_address || place.name || "",
+          placeId: place.place_id,
+          coordinates,
+          types: place.types || [],
+        };
+        
+        console.log("📍 Prepared selectedPlace:", selectedPlace);
+        console.log("📍 Calling onSelectRef.current with:", selectedPlace);
+        
+        // Call onSelect callback using ref to ensure we have the latest version
+        try {
+          onSelectRef.current(selectedPlace);
+          console.log("✅ onSelect callback executed successfully");
+        } catch (error) {
+          console.error("❌ Error in onSelect callback:", error);
+          console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack trace");
+        }
+        
+        // Clear the input value after selection (only if clearOnSelect is true)
+        if (clearOnSelect) {
+          setTimeout(() => {
+            if (inputRef.current) {
+              inputRef.current.value = "";
+              onChangeRef.current(""); // Update controlled value
+            }
+          }, 100);
         }
       });
+      
+      console.log("✅ Autocomplete listener attached");
 
       autocompleteRef.current = autocomplete;
       console.log("✅ Autocomplete initialized successfully");
@@ -206,12 +267,38 @@ export function PlacesAutocomplete({
     }
   };
 
-  // Re-initialize when script loads or location bias changes
+  // Re-initialize when script loads or when countryRestriction changes
   useEffect(() => {
     if (isScriptLoaded && inputRef.current) {
+      // Clean up existing autocomplete if it exists
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
       initializeAutocomplete();
     }
-  }, [isScriptLoaded, locationBias]);
+  }, [isScriptLoaded, countryRestriction]);
+  
+  // Update location bias if autocomplete already exists (only if no country restriction)
+  useEffect(() => {
+    if (autocompleteRef.current && locationBias && !countryRestriction && window.google?.maps) {
+      const circle = new window.google.maps.Circle({
+        center: locationBias,
+        radius: 50000,
+      });
+      autocompleteRef.current.setBounds(circle.getBounds());
+    }
+  }, [locationBias, countryRestriction]);
+  
+  // Clean up autocomplete when component unmounts
+  useEffect(() => {
+    return () => {
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="relative">

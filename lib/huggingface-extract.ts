@@ -142,47 +142,12 @@ export async function extractPlacesWithHF(
     
     console.log(`Unique location entities: ${uniqueEntities.length}`);
 
-    // Step 2: Classify places using Zero-Shot Classification
+    // Step 2: Extract places (categories will be determined by Google Places API during validation)
     const places: ExtractedPlace[] = [];
-    const categoryLabels = ["food", "attraction", "nightlife", "nature", "shopping", "entertainment", "wellness", "religious", "museum", "adventure", "beach", "other"];
     
     // Process entities in batches to avoid rate limits
     for (const entity of uniqueEntities.slice(0, 30)) {
-      let category: PlaceCategory = "other";
       let confidence = 0.7;
-      
-      // Try AI classification if we have enough context
-      try {
-        const classificationModel = "facebook/bart-large-mnli";
-        const classificationText = `${entity}. ${textToProcess.substring(0, 200)}`;
-        
-        const classificationResult = await hf.zeroShotClassification({
-          model: classificationModel,
-          inputs: classificationText,
-          parameters: {
-            candidate_labels: categoryLabels,
-          },
-        });
-        
-        // Get the highest scoring label
-        // Handle both array and object response formats
-        let result: any;
-        if (Array.isArray(classificationResult)) {
-          result = classificationResult[0];
-        } else {
-          result = classificationResult;
-        }
-        
-        if (result && result.labels && result.scores && Array.isArray(result.labels) && Array.isArray(result.scores)) {
-          const maxIndex = result.scores.indexOf(Math.max(...result.scores));
-          category = (result.labels[maxIndex] || "other") as PlaceCategory;
-          confidence = result.scores[maxIndex] || 0.7;
-        }
-      } catch (error) {
-        console.warn(`Classification failed for ${entity}, using keyword matching:`, error);
-        // Fallback to keyword matching
-        category = inferCategoryFromContext(entity, textToProcess);
-      }
       
       // Step 3: Infer vibe (optional, can be slow for many places)
       let vibe: PlaceVibe | undefined;
@@ -195,10 +160,10 @@ export async function extractPlacesWithHF(
       
       places.push({
         name: entity,
-        category,
+        category: "other" as PlaceCategory, // Category will be determined by Google Places API during validation
         vibe,
         confidence,
-        context: "Extracted via Named Entity Recognition + Classification",
+        context: "Extracted via Named Entity Recognition",
       });
     }
 
@@ -313,24 +278,11 @@ The text may contain structured lists like:
 
 Extract EVERY place name you find. Return a JSON object with a "places" array. Each place should have:
 - name: The exact place name (required)
-- category: One of: "food", "attraction", "nightlife", "nature", "shopping", "entertainment", "wellness", "religious", "museum", "adventure", "beach", "other" (required)
 - confidence: A number between 0.8 and 1.0 (required)
 
-Categories:
-- "food": Restaurants, cafes, food spots, street food, bakeries
-- "attraction": Landmarks, viewpoints, historical sites, cultural sites
-- "nightlife": Bars, clubs, rooftop bars, nightlife venues, pubs
-- "nature": Parks, gardens, nature reserves, hiking trails
-- "shopping": Malls, markets, shopping districts, boutiques
-- "entertainment": Theaters, cinemas, live music venues, shows
-- "wellness": Spas, yoga studios, wellness centers, massage parlors
-- "religious": Temples, churches, mosques, shrines, religious sites
-- "museum": Museums, art galleries, exhibitions
-- "adventure": Adventure sports, outdoor activities, extreme sports
-- "beach": Beaches, beach clubs, coastal areas
-- "other": Everything else
+Note: Do NOT categorize places. Categories will be determined by Google Places API during validation.
 
-Return format: {"places": [{"name": "...", "category": "...", "confidence": 0.9}, ...]}`
+Return format: {"places": [{"name": "...", "confidence": 0.9}, ...]}`
         },
         {
           role: "user",
@@ -360,158 +312,16 @@ Return format: {"places": [{"name": "...", "category": "...", "confidence": 0.9}
 
   return places.map((p: any) => ({
     name: p.name || "",
-    category: (p.category || "other") as PlaceCategory,
+    category: "other" as PlaceCategory, // Category will be determined by Google Places API during validation
     confidence: Math.min(1, Math.max(0.8, p.confidence || 0.9)),
     context: "Extracted via OpenAI",
   }));
 }
 
 /**
- * Infer category from context using keyword matching (fallback)
+ * REMOVED: inferCategoryFromContext - Categories are now only determined by Google Places API
+ * This function has been completely removed. All categories must come from Google Places API types.
  */
-function inferCategoryFromContext(entity: string, text: string): PlaceCategory {
-  const lowerEntity = entity.toLowerCase();
-  const lowerText = text.toLowerCase();
-  
-  // Food keywords
-  if (
-    lowerText.includes(`${lowerEntity} restaurant`) ||
-    lowerText.includes(`${lowerEntity} cafe`) ||
-    lowerText.includes(`eat at ${lowerEntity}`) ||
-    lowerText.includes(`dining at ${lowerEntity}`) ||
-    lowerText.includes(`food at ${lowerEntity}`) ||
-    lowerEntity.includes("restaurant") ||
-    lowerEntity.includes("cafe") ||
-    lowerEntity.includes("seafood") ||
-    lowerEntity.includes("bistro") ||
-    lowerEntity.includes("bakery") ||
-    lowerEntity.includes("eatery")
-  ) {
-    return "food";
-  }
-  
-  // Nightlife keywords
-  if (
-    lowerText.includes(`${lowerEntity} bar`) ||
-    lowerText.includes(`${lowerEntity} club`) ||
-    lowerText.includes(`nightlife ${lowerEntity}`) ||
-    lowerEntity.includes("bar") ||
-    lowerEntity.includes("club") ||
-    lowerEntity.includes("rooftop") ||
-    lowerEntity.includes("pub") ||
-    lowerEntity.includes("lounge")
-  ) {
-    return "nightlife";
-  }
-  
-  // Beach keywords (check before nature)
-  if (
-    lowerText.includes(`${lowerEntity} beach`) ||
-    lowerEntity.includes("beach") ||
-    lowerEntity.includes("shore") ||
-    lowerEntity.includes("coast")
-  ) {
-    return "beach";
-  }
-  
-  // Nature keywords
-  if (
-    lowerText.includes(`${lowerEntity} park`) ||
-    lowerText.includes(`${lowerEntity} nature`) ||
-    lowerEntity.includes("park") ||
-    lowerEntity.includes("garden") ||
-    lowerEntity.includes("forest") ||
-    lowerEntity.includes("trail") ||
-    lowerEntity.includes("reserve")
-  ) {
-    return "nature";
-  }
-  
-  // Religious keywords
-  if (
-    lowerText.includes(`${lowerEntity} temple`) ||
-    lowerEntity.includes("temple") ||
-    lowerEntity.includes("church") ||
-    lowerEntity.includes("mosque") ||
-    lowerEntity.includes("shrine") ||
-    lowerEntity.includes("cathedral") ||
-    lowerEntity.includes("monastery")
-  ) {
-    return "religious";
-  }
-  
-  // Museum keywords
-  if (
-    lowerText.includes(`${lowerEntity} museum`) ||
-    lowerEntity.includes("museum") ||
-    lowerEntity.includes("gallery") ||
-    lowerEntity.includes("exhibition")
-  ) {
-    return "museum";
-  }
-  
-  // Shopping keywords
-  if (
-    lowerText.includes(`${lowerEntity} market`) ||
-    lowerText.includes(`${lowerEntity} mall`) ||
-    lowerText.includes(`shopping ${lowerEntity}`) ||
-    lowerEntity.includes("market") ||
-    lowerEntity.includes("mall") ||
-    lowerEntity.includes("shop") ||
-    lowerEntity.includes("bazaar") ||
-    lowerEntity.includes("boutique")
-  ) {
-    return "shopping";
-  }
-  
-  // Entertainment keywords
-  if (
-    lowerEntity.includes("theater") ||
-    lowerEntity.includes("theatre") ||
-    lowerEntity.includes("cinema") ||
-    lowerEntity.includes("show") ||
-    lowerEntity.includes("concert")
-  ) {
-    return "entertainment";
-  }
-  
-  // Wellness keywords
-  if (
-    lowerEntity.includes("spa") ||
-    lowerEntity.includes("massage") ||
-    lowerEntity.includes("wellness") ||
-    lowerEntity.includes("yoga") ||
-    lowerEntity.includes("sauna")
-  ) {
-    return "wellness";
-  }
-  
-  // Adventure keywords
-  if (
-    lowerEntity.includes("adventure") ||
-    lowerEntity.includes("safari") ||
-    lowerEntity.includes("diving") ||
-    lowerEntity.includes("climbing") ||
-    lowerEntity.includes("zipline") ||
-    lowerEntity.includes("rafting")
-  ) {
-    return "adventure";
-  }
-  
-  // Attraction keywords (general, check last)
-  if (
-    lowerText.includes(`visit ${lowerEntity}`) ||
-    lowerText.includes(`see ${lowerEntity}`) ||
-    lowerEntity.includes("tower") ||
-    lowerEntity.includes("palace") ||
-    lowerEntity.includes("monument") ||
-    lowerEntity.includes("landmark")
-  ) {
-    return "attraction";
-  }
-  
-  return "other";
-}
 
 /**
  * Infer vibe using sentiment analysis (optional, can be slow)

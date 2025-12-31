@@ -96,6 +96,13 @@ export interface Day {
   date?: string;
   routes: string[]; // Route IDs
   places: string[]; // Place IDs
+  endDestination?: {
+    type: 'hotel' | 'place';
+    placeId?: string;
+    name: string;
+    address?: string;
+    coordinates?: Coordinates;
+  };
 }
 
 // Inspiration Input Types

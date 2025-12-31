@@ -272,4 +272,134 @@ export async function geocodePlaceName(
   }
 }
 
+/**
+ * Discover new places along a route using Google Places API
+ */
+export async function discoverPlacesAlongRoute(
+  routeStart: Coordinates,
+  routeEnd: Coordinates,
+  routeSteps: Array<{ start: Coordinates; end: Coordinates }>,
+  categories?: string[]
+): Promise<Array<{
+  name: string;
+  placeId: string;
+  coordinates: Coordinates;
+  types: string[];
+  rating?: number;
+  userRatingsTotal?: number;
+  priceLevel?: number;
+  detourCost: number;
+  distanceFromRoute: number;
+}>> {
+  if (!GOOGLE_PLACES_API_KEY) {
+    console.error("Google Places API key not found");
+    return [];
+  }
+
+  try {
+    // Sample points along the route (every ~500m)
+    const samplePoints: Coordinates[] = [];
+    
+    for (const step of routeSteps) {
+      samplePoints.push(step.start);
+    }
+    if (routeSteps.length > 0) {
+      samplePoints.push(routeSteps[routeSteps.length - 1].end);
+    }
+
+    // Search for places near each sample point
+    const allPlaces = new Map<string, any>(); // Use Map to deduplicate by placeId
+
+    for (const point of samplePoints) {
+      // Search for different types of places
+      const searchTypes = categories || [
+        'restaurant',
+        'cafe',
+        'tourist_attraction',
+        'museum',
+        'park',
+        'shopping_mall',
+        'bar',
+        'night_club'
+      ];
+
+      for (const type of searchTypes) {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${point.lat},${point.lng}&radius=1000&type=${type}&key=${GOOGLE_PLACES_API_KEY}`
+        );
+
+        if (!response.ok) continue;
+
+        const data = await response.json();
+
+        if (data.status === "OK" && data.results) {
+          for (const place of data.results) {
+            if (!allPlaces.has(place.place_id)) {
+              allPlaces.set(place.place_id, {
+                name: place.name,
+                placeId: place.place_id,
+                coordinates: {
+                  lat: place.geometry.location.lat,
+                  lng: place.geometry.location.lng,
+                },
+                types: place.types || [],
+                rating: place.rating,
+                userRatingsTotal: place.user_ratings_total,
+                priceLevel: place.price_level,
+              });
+            }
+          }
+        }
+
+        // Rate limiting - wait a bit between requests
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    // Calculate detour cost for each place
+    const placesWithDetour = [];
+    
+    for (const place of allPlaces.values()) {
+      // Find closest point on route
+      let minDistance = Infinity;
+      let closestStepIndex = 0;
+
+      for (let i = 0; i < routeSteps.length; i++) {
+        const step = routeSteps[i];
+        const distance = distanceToLineSegment(
+          place.coordinates,
+          step.start,
+          step.end
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestStepIndex = i;
+        }
+      }
+
+      // Only include places within 2km of route
+      if (minDistance < 2000) {
+        const detourCost = Math.round((minDistance / 1000) * 2); // ~2 min per km
+
+        placesWithDetour.push({
+          ...place,
+          detourCost,
+          distanceFromRoute: Math.round(minDistance),
+        });
+      }
+    }
+
+    // Sort by detour cost (closest to route first)
+    placesWithDetour.sort((a, b) => a.detourCost - b.detourCost);
+
+    // Return top 20 places
+    return placesWithDetour.slice(0, 20);
+
+  } catch (error) {
+    console.error("Error discovering places along route:", error);
+    return [];
+  }
+}
+
 

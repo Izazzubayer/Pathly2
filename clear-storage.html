@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Pathly Storage</title>
+</head>
+<body>
+    <h1>Clear Pathly Storage</h1>
+    <button onclick="clearStorage()">Clear All Trip Data</button>
+    <p id="result"></p>
+    
+    <script>
+        function clearStorage() {
+            localStorage.clear();
+            document.getElementById('result').innerText = '✅ All trip data cleared! You can close this tab.';
+        }
+    </script>
+</body>
+</html>

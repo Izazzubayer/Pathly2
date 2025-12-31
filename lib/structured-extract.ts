@@ -8,28 +8,19 @@ export function extractPlacesFromStructuredText(text: string): ExtractedPlace[] 
   const places: ExtractedPlace[] = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
-  let currentCategory: PlaceCategory = "other";
   let currentSection = "";
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lowerLine = line.toLowerCase();
     
-    // Detect section headers and set category
-    if (lowerLine.includes("bar") || lowerLine.includes("club") || lowerLine.includes("nightlife")) {
-      currentCategory = "nightlife";
-      currentSection = line;
-      continue;
-    } else if (lowerLine.includes("food") || lowerLine.includes("restaurant") || lowerLine.includes("eat") || lowerLine.includes("seafood") || lowerLine.includes("cafe")) {
-      currentCategory = "food";
-      currentSection = line;
-      continue;
-    } else if (lowerLine.includes("view") || lowerLine.includes("visit") || lowerLine.includes("museum") || lowerLine.includes("attraction") || lowerLine.includes("temple")) {
-      currentCategory = "attraction";
-      currentSection = line;
-      continue;
-    } else if (lowerLine.includes("park") || lowerLine.includes("nature") || lowerLine.includes("beach")) {
-      currentCategory = "nature";
+    // Detect section headers (for context only, not for categorization)
+    if (lowerLine.includes("bar") || lowerLine.includes("club") || lowerLine.includes("nightlife") ||
+        lowerLine.includes("food") || lowerLine.includes("restaurant") || lowerLine.includes("eat") || 
+        lowerLine.includes("seafood") || lowerLine.includes("cafe") ||
+        lowerLine.includes("view") || lowerLine.includes("visit") || lowerLine.includes("museum") || 
+        lowerLine.includes("attraction") || lowerLine.includes("temple") ||
+        lowerLine.includes("park") || lowerLine.includes("nature") || lowerLine.includes("beach")) {
       currentSection = line;
       continue;
     }
@@ -71,35 +62,12 @@ export function extractPlacesFromStructuredText(text: string): ExtractedPlace[] 
       
       // Skip if too short or too long, or is a common word
       if (placeName.length >= 3 && placeName.length <= 100 && !isCommonWord(placeName)) {
-        // Determine category based on context
-        let category = currentCategory;
-        const lowerName = placeName.toLowerCase();
-        
-        // Category override based on place name itself
-        if (lowerName.includes("bar") || lowerName.includes("club") || lowerName.includes("rooftop") || 
-            lowerName.includes("night") || lowerName.includes("elysium") || lowerName.includes("tribe")) {
-          category = "nightlife";
-        } else if (lowerName.includes("restaurant") || lowerName.includes("seafood") || 
-                   lowerName.includes("cafe") || lowerName.includes("food") || 
-                   lowerName.includes("dining") || lowerName.includes("eat") ||
-                   lowerName.includes("kin") || lowerName.includes("phed") || lowerName.includes("uncle")) {
-          category = "food";
-        } else if (lowerName.includes("museum") || lowerName.includes("temple") || 
-                   lowerName.includes("view") || lowerName.includes("house") ||
-                   lowerName.includes("iconsiam") || lowerName.includes("centralworld") ||
-                   lowerName.includes("asiatique") || lowerName.includes("paragon") ||
-                   lowerName.includes("erawan") || lowerName.includes("village")) {
-          category = "attraction";
-        } else if (lowerName.includes("park") || lowerName.includes("beach") || lowerName.includes("nature")) {
-          category = "nature";
-        }
-        
         // Check if we already have this place
         const exists = places.some(p => p.name.toLowerCase() === placeName.toLowerCase());
         if (!exists) {
           places.push({
             name: placeName,
-            category,
+            category: "other", // Category will be determined by Google Places API during validation
             confidence: 0.85, // High confidence for structured lists
             context: currentSection || "Extracted from structured list",
           });

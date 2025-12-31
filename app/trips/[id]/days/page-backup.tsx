@@ -1168,8 +1168,9 @@ export default function DaysPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-4">
-        <div className="max-w-6xl mx-auto">
+      <div className="h-screen flex flex-col">
+        {/* Fixed Header */}
+        <div className="border-b bg-background z-10">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <Link href={`/trips/${trip.id}`}>

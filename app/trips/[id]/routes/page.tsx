@@ -8,12 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getTripById, updateTrip } from "@/lib/storage";
-import { calculateRoute, findPlacesAlongRoute, geocodePlaceName } from "@/lib/routes-api";
+import { calculateRoute, findPlacesAlongRoute, geocodePlaceName, discoverPlacesAlongRoute } from "@/lib/routes-api";
 import { getCategoryIcon, getCategoryLabel } from "@/lib/category-utils";
 import { Map } from "@/components/map";
 import { PlacesAutocomplete } from "@/components/places-autocomplete";
-import { ArrowLeft, ArrowRight, Plus, MapPin, Route, Check, X, Clock, Loader2, Map as MapIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, MapPin, Route, Check, X, Clock, Loader2, Map as MapIcon, Sparkles, Star } from "lucide-react";
 import type { Trip, Route as RouteType, Place, Coordinates } from "@/types";
+
+// Color mapping for place types - using shadcn theme colors
+const getPlaceTypeColor = (type: string): string => {
+  return 'bg-secondary text-secondary-foreground border-border';
+};
 
 export default function RoutesPage() {
   const params = useParams();
@@ -29,6 +34,15 @@ export default function RoutesPage() {
   const [routeEndName, setRouteEndName] = useState("");
   const [isCreatingRoute, setIsCreatingRoute] = useState(false);
   const [routePlacesLoading, setRoutePlacesLoading] = useState<Set<string>>(new Set());
+  const [discoveringPlaces, setDiscoveringPlaces] = useState(false);
+  const [discoveredPlaces, setDiscoveredPlaces] = useState<Array<{
+    name: string;
+    placeId: string;
+    coordinates: { lat: number; lng: number };
+    types: string[];
+    rating?: number;
+    detourCost: number;
+  }>>([]);
 
   useEffect(() => {
     const tripId = params.id as string;
@@ -126,6 +140,23 @@ export default function RoutesPage() {
       updateTrip(trip.id, updatedTrip);
       setTrip(updatedTrip);
 
+      // Discover new places along this route
+      console.log("🔍 Discovering places along route...");
+      setDiscoveringPlaces(true);
+      try {
+        const discovered = await discoverPlacesAlongRoute(
+          startCoords,
+          endCoords,
+          routeData.steps
+        );
+        console.log(`✅ Discovered ${discovered.length} places`);
+        setDiscoveredPlaces(discovered);
+      } catch (error) {
+        console.error("Error discovering places:", error);
+      } finally {
+        setDiscoveringPlaces(false);
+      }
+
       setShowNewRoute(false);
       setRouteStart("");
       setRouteEnd("");
@@ -211,6 +242,39 @@ export default function RoutesPage() {
     setTrip(updatedTrip);
   };
 
+  const handleAddDiscoveredPlace = (discoveredPlace: any) => {
+    if (!trip) return;
+
+    // Add to trip places
+    const newPlace: Place = {
+      id: `place_${Date.now()}`,
+      name: discoveredPlace.name,
+      category: "other", // Will be inferred from types
+      coordinates: discoveredPlace.coordinates,
+      placeId: discoveredPlace.placeId,
+      confidence: 1.0,
+      source: "Discovered along route",
+      confirmed: true, // Auto-confirm discovered places
+      validated: true,
+    };
+
+    const updatedTrip = {
+      ...trip,
+      places: [...trip.places, newPlace],
+      updatedAt: new Date().toISOString(),
+    };
+
+    updateTrip(trip.id, updatedTrip);
+    setTrip(updatedTrip);
+
+    // Remove from discovered list
+    setDiscoveredPlaces(prev => prev.filter(p => p.placeId !== discoveredPlace.placeId));
+  };
+
+  const handleDismissDiscoveredPlace = (placeId: string) => {
+    setDiscoveredPlaces(prev => prev.filter(p => p.placeId !== placeId));
+  };
+
   if (loading) {
     return (
       <main className="min-h-screen bg-background">
@@ -254,7 +318,7 @@ export default function RoutesPage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-muted-foreground" />
-                <CardTitle>Hotel (Anchor)</CardTitle>
+                <CardTitle>Hotel</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -297,9 +361,9 @@ export default function RoutesPage() {
                     <p className="text-xs text-muted-foreground">
                       {routeStart ? (
                         routeStartCoords ? (
-                          "✓ Location selected with coordinates"
+                          "Location selected with coordinates"
                         ) : (
-                          "⚠️ Location selected but coordinates not available"
+                          "Location selected but coordinates not available"
                         )
                       ) : (
                         `Leave empty to use hotel as start (${trip.hotel.name})`
@@ -328,9 +392,9 @@ export default function RoutesPage() {
                     <p className="text-xs text-muted-foreground">
                       {routeEnd ? (
                         routeEndCoords ? (
-                          "✓ Location selected with coordinates"
+                          "Location selected with coordinates"
                         ) : (
-                          "⚠️ Location selected but coordinates not available"
+                          "Location selected but coordinates not available"
                         )
                       ) : (
                         "Search and select the end location for your route"
@@ -539,6 +603,96 @@ export default function RoutesPage() {
                 );
               })}
             </div>
+          )}
+
+          {/* Discovered Places Along Route */}
+          {discoveringPlaces && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="py-12">
+                <div className="text-center space-y-4">
+                  <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
+                  <div>
+                    <p className="font-semibold">Discovering places along your route...</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Finding restaurants, cafes, attractions, and more
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!discoveringPlaces && discoveredPlaces.length > 0 && (
+            <Card className="border-primary/20">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      Discovered Places Along Your Route
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {discoveredPlaces.length} places found within 2km of your route
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDiscoveredPlaces([])}
+                  >
+                    Dismiss All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {discoveredPlaces.map((place) => (
+                    <div
+                      key={place.placeId}
+                      className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary/30 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold">{place.name}</h4>
+                        <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                          {place.rating && (
+                            <div className="flex items-center gap-1">
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              <span>{place.rating.toFixed(1)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>+{place.detourCost} min detour</span>
+                          </div>
+                          {place.types && place.types.length > 0 && (
+                            <span className={`text-xs px-2 py-0.5 rounded capitalize border ${getPlaceTypeColor(place.types[0])}`}>
+                              {place.types[0].replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddDiscoveredPlace(place)}
+                        >
+                          <Check className="mr-2 h-4 w-4" />
+                          Add
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDismissDiscoveredPlace(place.placeId)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Continue Button */}

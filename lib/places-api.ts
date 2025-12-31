@@ -81,10 +81,35 @@ export async function validatePlace(
     const addressParts = primaryResult.formatted_address.split(",");
     const area = addressParts.length > 1 ? addressParts[addressParts.length - 2].trim() : undefined;
 
-    // Determine category from place types
-    const category = inferCategory(primaryResult.types);
+    // Fetch place details to get types (no inference, only what Google provides)
+    let category = inferCategory(primaryResult.types);
+    if (primaryResult.place_id) {
+      try {
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${primaryResult.place_id}&fields=types,primary_type,category&key=${GOOGLE_PLACES_API_KEY}`;
+        const detailsResponse = await fetch(detailsUrl);
+        
+        if (detailsResponse.ok) {
+          const detailsData = await detailsResponse.json();
+          if (detailsData.status === "OK" && detailsData.result) {
+            const place = detailsData.result;
+            
+            // Only use category if Google explicitly provides it
+            const googleCategory = (place as any).primary_type || (place as any).category;
+            if (googleCategory) {
+              category = googleCategory;
+            } else {
+              // Use formatted types (will be empty string if only generic types)
+              category = inferCategory(place.types || primaryResult.types);
+            }
+            
+            console.log("📍 Category from Google:", category || "(none)");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching place details:", error);
+      }
+    }
 
-    // Get alternatives if multiple results
     const alternatives =
       results.length > 1
         ? results.slice(1, 4).map((r) => ({
@@ -116,77 +141,32 @@ export async function validatePlace(
   }
 }
 
+/**
+ * Format Google's type for display - NO mapping, NO inference
+ * Returns the first meaningful type from Google's types array, formatted for display
+ * Returns empty string if only generic types are available
+ */
 export function inferCategory(types: string[]): string {
-  // Map Google Places types to our categories
-  const typeMap: Record<string, string> = {
-    // Food & Dining
-    restaurant: "food",
-    food: "food",
-    cafe: "food",
-    bakery: "food",
-    meal_takeaway: "food",
-    meal_delivery: "food",
-    
-    // Nightlife
-    bar: "nightlife",
-    night_club: "nightlife",
-    
-    // Nature
-    park: "nature",
-    zoo: "nature",
-    aquarium: "nature",
-    natural_feature: "nature",
-    
-    // Shopping
-    shopping_mall: "shopping",
-    department_store: "shopping",
-    store: "shopping",
-    clothing_store: "shopping",
-    jewelry_store: "shopping",
-    shoe_store: "shopping",
-    
-    // Entertainment
-    movie_theater: "entertainment",
-    amusement_park: "entertainment",
-    bowling_alley: "entertainment",
-    casino: "entertainment",
-    
-    // Museum & Culture
-    museum: "museum",
-    art_gallery: "museum",
-    
-    // Attractions
-    tourist_attraction: "attraction",
-    point_of_interest: "attraction",
-    landmark: "attraction",
-    
-    // Religious
-    church: "religious",
-    mosque: "religious",
-    synagogue: "religious",
-    hindu_temple: "religious",
-    place_of_worship: "religious",
-    
-    // Wellness
-    spa: "wellness",
-    beauty_salon: "wellness",
-    gym: "wellness",
-    
-    // Beach
-    beach: "beach",
-    
-    // Adventure
-    campground: "adventure",
-    rv_park: "adventure",
-  };
-
-  for (const type of types) {
-    if (typeMap[type]) {
-      return typeMap[type];
-    }
+  if (!types || types.length === 0) {
+    return "";
   }
 
-  return "other";
+  // Filter out generic/useless types that don't tell the user anything meaningful
+  const genericTypes = ['point_of_interest', 'establishment', 'locality', 'political'];
+  const meaningfulTypes = types.filter(type => !genericTypes.includes(type));
+  
+  // If no meaningful types, return empty string (don't show anything)
+  if (meaningfulTypes.length === 0) {
+    return "";
+  }
+  
+  const primaryType = meaningfulTypes[0];
+  
+  // Format for display: replace underscores with spaces, capitalize words
+  return primaryType
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 export async function geocodePlace(placeId: string): Promise<Coordinates | null> {
@@ -218,4 +198,3 @@ export async function geocodePlace(placeId: string): Promise<Coordinates | null>
     return null;
   }
 }
-
